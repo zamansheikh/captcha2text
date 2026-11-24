@@ -1,0 +1,38 @@
+# /etc/systemd/system/captcha2text.service (setup steps in docs/DEPLOY.md)
+[Unit]
+Description=Captcha2Text API
+After=network.target
+
+[Service]
+Type=simple
+User=captcha2text
+Group=captcha2text
+WorkingDirectory=/opt/captcha2text/app
+Environment=PYTHONUNBUFFERED=1
+Environment=C2T_MODELS_DIR=/opt/captcha2text/models
+Environment=C2T_DEFAULT_MODEL=current
+Environment=C2T_DB_PATH=/opt/captcha2text/data/captcha2text.db
+Environment=C2T_ORT_THREADS=2
+# One process: the rate limiter lives in memory. The app logs every solve itself.
+ExecStart=/opt/captcha2text/venv/bin/uvicorn captcha2text.api:app --host 127.0.0.1 --port 7030 --no-server-header --no-access-log
+Restart=always
+RestartSec=3
+
+# Cap what the API can take, so it can share a server with other services.
+CPUQuota=300%
+MemoryMax=3G
+
+# Hardening: read-only system, writes only to the data folder.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/opt/captcha2text/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,46 @@
+[project]
+name = "captcha2text"
+version = "0.1.0"
+description = "Captcha image to text API"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "onnxruntime>=1.18",
+    "numpy>=1.26",
+    "pillow>=10.4",
+]
+
+[project.optional-dependencies]
+# Only needed on the machine that trains models, not on the API server.
+train = [
+    "torch>=2.3",
+    "onnx>=1.16",
+    "captcha>=0.6",
+]
+# Only to import ddddocr's pretrained model (training/import_ddddocr.py), not on the server.
+ddddocr = [
+    "ddddocr>=1.6",
+]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+    "onnx>=1.16",
+]
+
+[project.scripts]
+c2t-keys = "captcha2text.keys:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["captcha2text"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

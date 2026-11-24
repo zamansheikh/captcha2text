@@ -1,0 +1,22 @@
+# For a server with Docker. Without Docker, use systemd instead: see docs/DEPLOY.md.
+# Put model folders in models/<name>, point models/current at the default one, then:
+#   docker compose up -d --build
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7030:8000"   # put a reverse proxy with HTTPS in front of this port
+    volumes:
+      - ./models:/models:ro     # every model folder; keys without a model use models/current
+      - c2t-data:/data          # API keys + usage log (SQLite)
+    environment:
+      C2T_ORT_THREADS: "2"      # shared box: don't let one request take every core
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  c2t-data:

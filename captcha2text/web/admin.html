@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Captcha2Text Admin</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: a working dashboard. Top bar with tabs, one content column; tables scroll inside their own box. */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --raised: #fafbfc; --fg: #141922; --muted: #5a6373; --line: #dde2ea;
+  --accent: #2b4dd3; --accent-ink: #ffffff; --accent-soft: #e9eeff;
+  --ok: #12764a; --ok-soft: #e3f4eb; --warn: #9a5500; --warn-soft: #fcefdc; --err: #b42318; --err-soft: #fde8e6;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1016; --surface: #141922; --raised: #181e28; --fg: #e5e9f0; --muted: #9aa3b3; --line: #252c38;
+    --accent: #8fa6ff; --accent-ink: #0d1016; --accent-soft: #1a2342;
+    --ok: #52c78f; --ok-soft: #12291f; --warn: #f0a640; --warn-soft: #2e2210; --err: #ff7a6e; --err-soft: #321714;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1016; --surface: #141922; --raised: #181e28; --fg: #e5e9f0; --muted: #9aa3b3; --line: #252c38;
+  --accent: #8fa6ff; --accent-ink: #0d1016; --accent-soft: #1a2342;
+  --ok: #52c78f; --ok-soft: #12291f; --warn: #f0a640; --warn-soft: #2e2210; --err: #ff7a6e; --err-soft: #321714;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.55 var(--font-body);
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 1.35rem; font-weight: 600; }
+h3 { font-size: 1rem; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.mono { font-family: var(--font-mono); font-size: 0.85em; }
+.muted { color: var(--muted); }
+[hidden] { display: none !important; }
+
+button, .btn {
+  font: 500 0.88rem var(--font-body); border-radius: 7px; padding: 7px 13px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+}
+button:hover { border-color: var(--muted); }
+button:disabled { opacity: 0.55; cursor: default; }
+.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.primary:hover { filter: brightness(1.08); border-color: var(--accent); }
+.danger { color: var(--err); }
+.danger-solid { background: var(--err); color: #fff; border-color: var(--err); }
+.link { background: none; border: 0; padding: 0; color: var(--accent); }
+input, select, textarea {
+  font: 400 0.9rem var(--font-body); color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; width: 100%;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+label { display: flex; flex-direction: column; gap: 5px; font-weight: 500; font-size: 0.85rem; }
+
+/* Sign-in */
+.signin { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.signin form { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; }
+.brand svg { width: 26px; height: 26px; flex: none; }
+.brand .mark { fill: var(--accent); } .brand .wave { stroke: var(--accent-ink); }
+.chip { font: 600 0.68rem var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+
+/* Top bar */
+.top { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--surface); z-index: 10; }
+.top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 12px; }
+.who { display: flex; align-items: center; gap: 12px; font-size: 0.88rem; }
+.tabs { display: flex; gap: 2px; overflow-x: auto; }
+.tabs a {
+  padding: 10px 14px; color: var(--muted); text-decoration: none; font-weight: 500;
+  border-bottom: 2px solid transparent; white-space: nowrap; display: flex; align-items: center; gap: 6px;
+}
+.tabs a:hover { color: var(--fg); }
+.tabs a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--accent); }
+.count { font: 600 0.7rem var(--font-body); background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 1px 7px; }
+
+main { padding-block: 28px 64px; display: flex; flex-direction: column; gap: 20px; }
+section[data-view] { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.head p { color: var(--muted); margin-top: 4px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; }
+
+/* Overview */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { display: flex; flex-direction: column; gap: 4px; }
+.tile .label { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.tile .value { font: 600 1.7rem var(--font-display); font-variant-numeric: tabular-nums; }
+.tile .sub { color: var(--muted); font-size: 0.8rem; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font: 10px var(--font-body); }
+.chart .solved { fill: var(--accent); }
+.chart .failed { fill: var(--err); }
+.legend { display: flex; gap: 16px; color: var(--muted); font-size: 0.8rem; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.callout { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--accent-soft); border-radius: 10px; padding: 12px 16px; }
+
+/* Tables */
+.table { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; background: var(--raised); }
+td.num { font-variant-numeric: tabular-nums; text-align: right; }
+th.num { text-align: right; }
+tr.off td { color: var(--muted); }
+tr.off td:first-child { text-decoration: line-through; }
+.actions { display: flex; gap: 6px; justify-content: flex-end; }
+.status { font: 600 0.7rem var(--font-body); text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; }
+.status.active { background: var(--ok-soft); color: var(--ok); }
+.status.revoked { background: var(--err-soft); color: var(--err); }
+.status.new { background: var(--warn-soft); color: var(--warn); }
+.status.done { background: var(--ok-soft); color: var(--ok); }
+.status.dismissed { background: var(--line); color: var(--muted); }
+.edit-row td { background: var(--raised); }
+.edit-row .fields { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.edit-row label { width: 200px; }
+
+/* Create key */
+.create { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: 12px; align-items: end; }
+.newkey { border: 2px solid var(--ok); background: var(--ok-soft); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.newkey .keybox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.newkey code { font: 500 0.95rem var(--font-mono); background: var(--surface); color: var(--fg); padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line); word-break: break-all; flex: 1 1 320px; user-select: all; }
+.newkey strong { color: var(--ok); }
+.toolbar { display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: 0.85rem; }
+.toolbar label { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; }
+.toolbar input { width: auto; }
+
+/* Requests */
+.requests { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.req { display: flex; flex-direction: column; gap: 10px; }
+.req.handled { opacity: 0.7; }
+.req-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.req dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 0.88rem; }
+.req dt { color: var(--muted); }
+.req dd { margin: 0; overflow-wrap: anywhere; }
+.req .desc { background: var(--raised); border-radius: 8px; padding: 10px 12px; font-size: 0.88rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.req .actions { justify-content: flex-start; }
+.empty { text-align: center; color: var(--muted); padding: 40px 16px; }
+.msg { padding: 10px 14px; border-radius: 8px; font-size: 0.88rem; }
+.msg.err { background: var(--err-soft); color: var(--err); }
+.msg.ok { background: var(--ok-soft); color: var(--ok); }
+
+@media (max-width: 860px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .create { grid-template-columns: minmax(0, 1fr); }
+  .requests { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .who .name { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="signin" class="signin" hidden>
+  <form id="signin-form" novalidate>
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect class="mark" width="32" height="32" rx="7"/><path class="wave" d="M6 19c4-7 7 3 10-3s6 5 10-2" fill="none" stroke-width="2.6" stroke-linecap="round"/></svg>
+      Captcha2Text <span class="chip">Admin</span>
+    </div>
+    <label for="si-user">Username<input id="si-user" autocomplete="username" autocapitalize="none" required></label>
+    <label for="si-pass">Password<input id="si-pass" type="password" autocomplete="current-password" required></label>
+    <button class="primary" type="submit" id="si-btn">Sign in</button>
+    <div id="si-msg" class="msg err" role="alert" hidden></div>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="wrap">
+      <div class="top-row">
+        <div class="brand">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><rect class="mark" width="32" height="32" rx="7"/><path class="wave" d="M6 19c4-7 7 3 10-3s6 5 10-2" fill="none" stroke-width="2.6" stroke-linecap="round"/></svg>
+          Captcha2Text <span class="chip">Admin</span>
+        </div>
+        <div class="who"><span class="name muted" id="who"></span><button type="button" id="signout">Sign out</button></div>
+      </div>
+      <nav class="tabs" aria-label="Sections">
+        <a href="#overview" data-tab="overview">Overview</a>
+        <a href="#keys" data-tab="keys">API keys</a>
+        <a href="#requests" data-tab="requests">Requests <span class="count" id="req-count" hidden></span></a>
+        <a href="#models" data-tab="models">Models</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="global-msg" class="msg err" role="alert" hidden></div>
+
+    <!-- Overview -->
+    <section data-view="overview" hidden>
+      <div class="head"><div><h2>Overview</h2><p id="ov-model"></p></div></div>
+      <div id="ov-callout" class="callout" hidden></div>
+      <div class="tiles">
+        <div class="card tile"><span class="label">Active keys</span><span class="value" id="ov-active">–</span><span class="sub" id="ov-revoked"></span></div>
+        <div class="card tile"><span class="label">Solved today (UTC)</span><span class="value" id="ov-today">–</span><span class="sub" id="ov-today-failed"></span></div>
+        <div class="card tile"><span class="label">Solved, last 30 days</span><span class="value" id="ov-solved">–</span><span class="sub">requests that returned text</span></div>
+        <div class="card tile"><span class="label">Failed, last 30 days</span><span class="value" id="ov-failed">–</span><span class="sub" id="ov-rate"></span></div>
+      </div>
+      <div class="card chart">
+        <div class="head" style="margin-bottom:12px"><h3>Requests per day, last 14 days</h3>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Solved</span><span><i style="background:var(--err)"></i>Failed</span></div>
+        </div>
+        <div id="ov-chart"></div>
+      </div>
+    </section>
+
+    <!-- Keys -->
+    <section data-view="keys" hidden>
+      <div class="head">
+        <div><h2>API keys</h2><p>Keys are shown once, when they're created. Only a hash is stored.</p></div>
+        <button class="primary" type="button" id="k-new">Create key</button>
+      </div>
+      <div id="k-created" class="newkey" hidden>
+        <strong>Key created for <span id="k-created-name"></span></strong>
+        <div class="keybox"><code id="k-created-key"></code><button type="button" id="k-copy">Copy</button></div>
+        <p>Copy it now and send it to the customer. It can't be shown again.</p>
+        <div><button type="button" id="k-created-done">Done</button></div>
+      </div>
+      <form id="k-form" class="card create" hidden novalidate>
+        <label for="k-name">Customer or app name<input id="k-name" maxlength="100" required></label>
+        <label for="k-rpm">Requests / minute<input id="k-rpm" type="number" min="0" max="100000" value="60" required></label>
+        <label for="k-model">Model<select id="k-model"></select></label>
+        <div style="display:flex;gap:8px"><button class="primary" type="submit" id="k-create">Create</button><button type="button" id="k-cancel">Cancel</button></div>
+        <input type="hidden" id="k-request">
+        <div id="k-msg" class="msg err" role="alert" hidden style="grid-column:1/-1"></div>
+      </form>
+      <div class="toolbar"><label for="k-show-revoked"><input type="checkbox" id="k-show-revoked">Show revoked keys</label><span id="k-summary"></span></div>
+      <div class="table">
+        <table>
+          <thead><tr><th>Name</th><th>Key</th><th>Model</th><th class="num">Limit</th><th class="num">Solved 30d</th><th class="num">Failed 30d</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+          <tbody id="k-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Requests -->
+    <section data-view="requests" hidden>
+      <div class="head"><div><h2>Access requests</h2><p>Sent from the form on the landing page.</p></div></div>
+      <div id="r-list" class="requests"></div>
+    </section>
+
+    <!-- Models -->
+    <section data-view="models" hidden>
+      <div class="head"><div><h2>Models</h2><p>Folders in the server's models directory. Keys without a model use the default.</p></div></div>
+      <div class="table">
+        <table>
+          <thead><tr><th>Folder</th><th>Name</th><th>Decoder</th><th>Allowed characters</th><th>Source</th><th class="num">Keys</th><th></th></tr></thead>
+          <tbody id="m-rows"></tbody>
+        </table>
+      </div>
+      <p class="muted">Add a model by uploading its folder with <span class="mono">deploy/systemd/deploy.sh &lt;folder&gt;</span>. Change the default by pointing <span class="mono">models/current</span> at another folder and restarting the service.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var state = { models: [], defaultFolder: "current", defaultName: "", keys: [], requests: [], tab: "overview" };
+  var $ = function (id) { return document.getElementById(id); };
+
+  // Build elements without ever parsing HTML from data.
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === "text") n.textContent = attrs[k];
+      else if (k === "class") n.className = attrs[k];
+      else if (k.slice(0, 2) === "on") n.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { if (c !== null && c !== undefined) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+  function fmt(n) { return Number(n || 0).toLocaleString("en-US"); }
+  function ago(iso) {
+    if (!iso) return "never";
+    var s = (Date.now() - Date.parse(iso)) / 1000;
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + " min ago";
+    if (s < 86400) return Math.floor(s / 3600) + " h ago";
+    if (s < 86400 * 30) return Math.floor(s / 86400) + " d ago";
+    return iso.slice(0, 10);
+  }
+  function flash(id, kind, text) { var m = $(id); m.className = "msg " + kind; m.textContent = text; m.hidden = !text; }
+
+  function api(method, path, body) {
+    return fetch(path, {
+      method: method, credentials: "same-origin",
+      headers: body !== undefined ? { "Content-Type": "application/json" } : {},
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (r.status === 401 && path !== "/admin/api/login") { showSignin(); throw new Error("Signed out."); }
+        if (!r.ok) throw new Error((data.error && data.error.message) || ("Request failed (" + r.status + ")."));
+        return data;
+      });
+    });
+  }
+
+  // ---- sign in -------------------------------------------------------------------------
+  function showSignin() { $("app").hidden = true; $("signin").hidden = false; $("si-user").focus(); }
+  function showApp(username) { $("signin").hidden = true; $("app").hidden = false; $("who").textContent = username; route(); }
+
+  $("signin-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var btn = $("si-btn"); btn.disabled = true; flash("si-msg", "err", "");
+    api("POST", "/admin/api/login", { username: $("si-user").value.trim(), password: $("si-pass").value })
+      .then(function (d) { $("si-pass").value = ""; showApp(d.username); })
+      .catch(function (err) { flash("si-msg", "err", err.message); })
+      .then(function () { btn.disabled = false; });
+  });
+  $("signout").addEventListener("click", function () {
+    api("POST", "/admin/api/logout", {}).catch(function () {}).then(showSignin);
+  });
+
+  // ---- tabs ------------------------------------------------------------------------------
+  var TABS = ["overview", "keys", "requests", "models"];
+  function route() {
+    var tab = (location.hash || "#overview").slice(1);
+    if (TABS.indexOf(tab) < 0) tab = "overview";
+    state.tab = tab;
+    document.querySelectorAll("[data-tab]").forEach(function (a) {
+      if (a.dataset.tab === tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    document.querySelectorAll("[data-view]").forEach(function (s) { s.hidden = s.dataset.view !== tab; });
+    flash("global-msg", "err", "");
+    ({ overview: loadOverview, keys: loadKeys, requests: loadRequests, models: loadModels })[tab]();
+  }
+  window.addEventListener("hashchange", function () { if (!$("app").hidden) route(); });
+  function fail(err) { if (err.message !== "Signed out.") flash("global-msg", "err", err.message); }
+
+  // ---- overview --------------------------------------------------------------------------
+  function loadOverview() {
+    api("GET", "/admin/api/overview").then(function (d) {
+      $("ov-active").textContent = fmt(d.active_keys);
+      $("ov-revoked").textContent = d.revoked_keys ? fmt(d.revoked_keys) + " revoked" : "none revoked";
+      $("ov-today").textContent = fmt(d.today.solved);
+      $("ov-today-failed").textContent = fmt(d.today.failed) + " failed";
+      $("ov-solved").textContent = fmt(d.solved_30d);
+      $("ov-failed").textContent = fmt(d.failed_30d);
+      var total = d.solved_30d + d.failed_30d;
+      $("ov-rate").textContent = total ? (100 * d.failed_30d / total).toFixed(1) + "% of requests" : "no requests yet";
+      $("ov-model").textContent = "Default model: " + d.default_model;
+      setRequestCount(d.new_requests);
+      var c = $("ov-callout"); clear(c);
+      c.hidden = !d.new_requests;
+      if (d.new_requests) {
+        c.appendChild(el("span", { text: d.new_requests + (d.new_requests === 1 ? " new access request is" : " new access requests are") + " waiting." }));
+        c.appendChild(el("a", { href: "#requests", text: "Review requests" }));
+      }
+      drawChart(d.daily);
+    }).catch(fail);
+  }
+
+  function drawChart(days) {
+    var W = 700, H = 200, L = 36, B = 22, T = 8, R = 4;
+    var max = Math.max(1, Math.max.apply(null, days.map(function (d) { return d.solved + d.failed; })));
+    var step = Math.pow(10, Math.floor(Math.log10(max)));
+    var top = Math.ceil(max / step) * step;
+    var ns = "http://www.w3.org/2000/svg";
+    function s(tag, attrs, text) {
+      var n = document.createElementNS(ns, tag);
+      Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+      if (text !== undefined) n.textContent = text;
+      return n;
+    }
+    var svg = s("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Requests per day for the last 14 days" });
+    [0, 0.5, 1].forEach(function (f) {
+      var y = T + (H - T - B) * (1 - f);
+      svg.appendChild(s("line", { x1: L, x2: W - R, y1: y, y2: y, class: "grid" }));
+      svg.appendChild(s("text", { x: L - 6, y: y + 3, "text-anchor": "end", class: "axis" }, fmt(Math.round(top * f))));
+    });
+    var slot = (W - L - R) / days.length, bw = Math.min(28, slot * 0.6);
+    days.forEach(function (d, i) {
+      var x = L + slot * i + (slot - bw) / 2, plot = H - T - B;
+      var hs = plot * d.solved / top, hf = plot * d.failed / top, base = H - B;
+      var g = s("g", {});
+      g.appendChild(s("title", {}, d.day + ": " + fmt(d.solved) + " solved, " + fmt(d.failed) + " failed"));
+      if (d.solved) g.appendChild(s("rect", { x: x, y: base - hs, width: bw, height: hs, rx: 2, class: "solved" }));
+      if (d.failed) g.appendChild(s("rect", { x: x, y: base - hs - hf, width: bw, height: hf, rx: 2, class: "failed" }));
+      svg.appendChild(g);
+      if (i % 2 === days.length % 2 || i === days.length - 1) {
+        svg.appendChild(s("text", { x: x + bw / 2, y: H - 6, "text-anchor": "middle", class: "axis" }, d.day.slice(5)));
+      }
+    });
+    var box = $("ov-chart"); clear(box); box.appendChild(svg);
+  }
+
+  // ---- models (also feeds the key form) --------------------------------------------------
+  function fetchModels() {
+    return api("GET", "/admin/api/models").then(function (d) {
+      state.models = d.models; state.defaultFolder = d.default_folder; state.defaultKeys = d.default_keys;
+      var def = d.models.filter(function (m) { return m.folder === d.default_folder; })[0];
+      state.defaultName = def ? def.name : d.default_folder;
+      return d;
+    });
+  }
+  function modelOptions(select, current) {
+    clear(select);
+    select.appendChild(el("option", { value: "", text: "Default (" + (state.defaultName || "loading…") + ")" }));
+    state.models.forEach(function (m) {
+      if (m.folder === state.defaultFolder) return;
+      var o = el("option", { value: m.folder, text: m.folder + (m.name !== m.folder ? " (" + m.name + ")" : "") });
+      if (m.folder === current) o.selected = true;
+      select.appendChild(o);
+    });
+  }
+  function loadModels() {
+    fetchModels().then(function (d) {
+      var body = $("m-rows"); clear(body);
+      d.models.forEach(function (m) {
+        var keys = m.folder === d.default_folder ? m.keys + d.default_keys : m.keys;
+        body.appendChild(el("tr", {}, [
+          el("td", { class: "mono", text: m.folder + (m.link_to ? " → " + m.link_to : "") }),
+          el("td", { text: m.name }),
+          el("td", { text: m.decoder }),
+          el("td", { class: "mono", text: m.allowed ? (m.allowed.length > 24 ? m.allowed.slice(0, 24) + "…" : m.allowed) : "all" }),
+          el("td", { text: m.source || (m.val_accuracy ? "trained here, val " + (100 * m.val_accuracy).toFixed(1) + "%" : "–") }),
+          el("td", { class: "num", text: fmt(keys) }),
+          el("td", {}, [m.folder === d.default_folder ? el("span", { class: "status active", text: "default" }) : null])
+        ]));
+      });
+      if (!d.models.length) body.appendChild(el("tr", {}, [el("td", { colspan: "7", class: "empty", text: "No model folders found." })]));
+    }).catch(fail);
+  }
+
+  // ---- keys ------------------------------------------------------------------------------
+  function loadKeys() {
+    Promise.all([fetchModels(), api("GET", "/admin/api/keys")]).then(function (r) {
+      state.keys = r[1].keys; renderKeys();
+    }).catch(fail);
+  }
+  function modelLabel(folder) { return folder || "default"; }
+  function renderKeys() {
+    var body = $("k-rows"); clear(body);
+    var showRevoked = $("k-show-revoked").checked;
+    var list = state.keys.filter(function (k) { return showRevoked || k.active; });
+    var active = state.keys.filter(function (k) { return k.active; }).length;
+    $("k-summary").textContent = fmt(active) + " active, " + fmt(state.keys.length - active) + " revoked";
+    list.forEach(function (k) { body.appendChild(keyRow(k)); });
+    if (!list.length) body.appendChild(el("tr", {}, [el("td", { colspan: "9", class: "empty", text: state.keys.length ? "No active keys. Tick “Show revoked keys” to see the others." : "No keys yet. Create the first one." })]));
+  }
+  function keyRow(k) {
+    var actions = el("div", { class: "actions" });
+    var tr = el("tr", { class: k.active ? "" : "off" }, [
+      el("td", { text: k.name, title: "Created " + k.created_at }),
+      el("td", { class: "mono", text: k.prefix + "…" }),
+      el("td", { text: modelLabel(k.model) }),
+      el("td", { class: "num", text: k.rpm ? fmt(k.rpm) + "/min" : "no limit" }),
+      el("td", { class: "num", text: fmt(k.solved_30d) }),
+      el("td", { class: "num", text: fmt(k.failed_30d) }),
+      el("td", { text: ago(k.last_used), title: k.last_used || "" }),
+      el("td", {}, [el("span", { class: "status " + (k.active ? "active" : "revoked"), text: k.active ? "active" : "revoked" })]),
+      el("td", {}, [actions])
+    ]);
+    if (k.active) {
+      actions.appendChild(el("button", { type: "button", text: "Edit", onclick: function () { editRow(tr, k); } }));
+      actions.appendChild(el("button", { type: "button", class: "danger", text: "Revoke", onclick: function () { confirmRevoke(actions, k); } }));
+    }
+    return tr;
+  }
+  function confirmRevoke(actions, k) {
+    clear(actions);
+    actions.appendChild(el("span", { class: "muted", text: "Revoke for good?" }));
+    actions.appendChild(el("button", { type: "button", class: "danger-solid", text: "Revoke", onclick: function (e) {
+      e.target.disabled = true;
+      api("POST", "/admin/api/keys/" + k.id + "/revoke", {}).then(loadKeys).catch(fail);
+    } }));
+    actions.appendChild(el("button", { type: "button", text: "Cancel", onclick: renderKeys }));
+  }
+  function editRow(tr, k) {
+    var next = tr.nextSibling;
+    if (next && next.classList && next.classList.contains("edit-row")) { next.remove(); return; }
+    var rpm = el("input", { type: "number", min: "0", max: "100000", value: String(k.rpm), id: "e-rpm-" + k.id });
+    var model = el("select", { id: "e-model-" + k.id }); modelOptions(model, k.model);
+    var msg = el("div", { class: "msg err", hidden: "" });
+    var row = el("tr", { class: "edit-row" }, [el("td", { colspan: "9" }, [
+      el("div", { class: "fields" }, [
+        el("label", { for: "e-rpm-" + k.id }, ["Requests / minute (0 = no limit)", rpm]),
+        el("label", { for: "e-model-" + k.id }, ["Model", model]),
+        el("button", { type: "button", class: "primary", text: "Save", onclick: function (e) {
+          e.target.disabled = true;
+          api("PATCH", "/admin/api/keys/" + k.id, { rpm: parseInt(rpm.value, 10), model: model.value || null })
+            .then(loadKeys).catch(function (err) { e.target.disabled = false; msg.hidden = false; msg.textContent = err.message; });
+        } }),
+        el("button", { type: "button", text: "Cancel", onclick: function () { row.remove(); } })
+      ]), msg
+    ])]);
+    tr.parentNode.insertBefore(row, tr.nextSibling);
+    rpm.focus();
+  }
+  $("k-show-revoked").addEventListener("change", renderKeys);
+
+  function openCreate(name, requestId) {
+    // Open at once so typing isn't lost; the model list fills in when it arrives.
+    $("k-created").hidden = true;
+    $("k-form").hidden = false;
+    $("k-name").value = name || "";
+    $("k-rpm").value = "60";
+    $("k-request").value = requestId ? String(requestId) : "";
+    modelOptions($("k-model"), null);
+    flash("k-msg", "err", "");
+    $("k-name").focus();
+    fetchModels().then(function () { modelOptions($("k-model"), $("k-model").value || null); }).catch(fail);
+  }
+  $("k-new").addEventListener("click", function () { openCreate("", null); });
+  $("k-cancel").addEventListener("click", function () { $("k-form").hidden = true; });
+  $("k-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = $("k-name").value.trim(), rpm = parseInt($("k-rpm").value, 10);
+    if (!name) { flash("k-msg", "err", "Enter a name."); return; }
+    if (isNaN(rpm) || rpm < 0) { flash("k-msg", "err", "Requests per minute must be 0 or more."); return; }
+    var body = { name: name, rpm: rpm, model: $("k-model").value || null };
+    if ($("k-request").value) body.request_id = parseInt($("k-request").value, 10);
+    $("k-create").disabled = true;
+    api("POST", "/admin/api/keys", body).then(function (d) {
+      $("k-form").hidden = true;
+      $("k-created-name").textContent = d.key.name;
+      $("k-created-key").textContent = d.api_key;
+      $("k-created").hidden = false;
+      $("k-copy").textContent = "Copy";
+      $("k-copy").focus();
+      loadKeys();
+      if (body.request_id) {
+        api("GET", "/admin/api/requests").then(function (r) {
+          setRequestCount(r.requests.filter(function (x) { return x.status === "new"; }).length);
+        }).catch(function () {});
+      }
+    }).catch(function (err) { flash("k-msg", "err", err.message); })
+      .then(function () { $("k-create").disabled = false; });
+  });
+  $("k-copy").addEventListener("click", function () {
+    var b = $("k-copy"), code = $("k-created-key");
+    function selectIt() { var r = document.createRange(); r.selectNodeContents(code); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selected, press Ctrl/⌘+C"; }
+    try { navigator.clipboard.writeText(code.textContent).then(function () { b.textContent = "Copied"; }, selectIt); } catch (e) { selectIt(); }
+  });
+  $("k-created-done").addEventListener("click", function () { $("k-created").hidden = true; $("k-created-key").textContent = ""; });
+
+  // ---- requests --------------------------------------------------------------------------
+  function setRequestCount(n) { var c = $("req-count"); c.textContent = String(n); c.hidden = !n; }
+  function loadRequests() {
+    api("GET", "/admin/api/requests").then(function (d) {
+      state.requests = d.requests;
+      setRequestCount(d.requests.filter(function (r) { return r.status === "new"; }).length);
+      var list = $("r-list"); clear(list);
+      if (!d.requests.length) { list.appendChild(el("div", { class: "card empty", text: "No requests yet. They appear here when someone fills in the form on the landing page." })); return; }
+      d.requests.forEach(function (r) { list.appendChild(requestCard(r)); });
+    }).catch(fail);
+  }
+  function requestCard(r) {
+    var website = null;
+    if (r.website) {
+      website = /^https?:\/\//i.test(r.website)
+        ? el("a", { href: r.website, target: "_blank", rel: "noopener noreferrer nofollow", text: r.website })
+        : document.createTextNode(r.website);
+    }
+    var rows = [["Email", el("span", { class: "mono", text: r.email })], ["Company", r.company], ["Website", website], ["Per month", r.volume]];
+    var dl = el("dl");
+    rows.forEach(function (row) { if (row[1]) { dl.appendChild(el("dt", { text: row[0] })); dl.appendChild(el("dd", {}, [row[1]])); } });
+    var actions = el("div", { class: "actions" });
+    if (r.status === "new") {
+      actions.appendChild(el("button", { type: "button", class: "primary", text: "Create key", onclick: function () {
+        location.hash = "#keys";
+        openCreate(r.company || r.name, r.id);
+      } }));
+      actions.appendChild(el("button", { type: "button", text: "Dismiss", onclick: function () { setStatus(r.id, "dismissed"); } }));
+    } else {
+      if (r.key_id) actions.appendChild(el("span", { class: "muted", text: "Key #" + r.key_id + " created " + ago(r.handled_at) }));
+      actions.appendChild(el("button", { type: "button", class: "link", text: "Move back to new", onclick: function () { setStatus(r.id, "new"); } }));
+    }
+    return el("article", { class: "card req" + (r.status === "new" ? "" : " handled") }, [
+      el("div", { class: "req-top" }, [
+        el("div", {}, [el("h3", { text: r.name }), el("span", { class: "muted", text: ago(r.created_at), title: r.created_at })]),
+        el("span", { class: "status " + r.status, text: r.status })
+      ]),
+      dl,
+      r.captcha ? el("div", { class: "desc", text: r.captcha }) : null,
+      actions
+    ]);
+  }
+  function setStatus(id, status) { api("POST", "/admin/api/requests/" + id, { status: status }).then(loadRequests).catch(fail); }
+
+  // ---- start -----------------------------------------------------------------------------
+  api("GET", "/admin/api/me").then(function (d) { showApp(d.username); }).catch(function () {});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+.pytest_cache/
+
+# runtime state: API keys and usage log
+data/
+
+# training inputs and outputs (large; keep them out of git)
+datasets/
+runs/
+words_captcha/
+checkpoints/
+*.pt
+
+# model files are deployed separately; keep only the folder
+models/*
+!models/.gitkeep
+
+# local tooling
+.claude/
+
+# your deploy server SSH host name (deploy/systemd/deploy.sh)
+.deploy-host

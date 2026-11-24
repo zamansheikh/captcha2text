@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Captcha2Text</title>
+<meta name="description" content="An API that reads text captchas. Send the image, get the text back in the same response, with a confidence score.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: one centred column; a two-part hero (claim | live-looking request), then short sections that alternate text and code. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --fg: #141922;
+  --muted: #5a6373;
+  --line: #dde2ea;
+  --accent: #2b4dd3;
+  --accent-ink: #ffffff;
+  --accent-soft: #e9eeff;
+  --code-bg: #11151c;
+  --code-fg: #e2e7f0;
+  --code-dim: #8b95a7;
+  --code-key: #9fb4ff;
+  --code-str: #b6e3a8;
+  --ok: #12764a;
+  --ok-soft: #e3f4eb;
+  --err: #b42318;
+  --err-soft: #fde8e6;
+  --captcha-bg: #eceee2;
+  --captcha-ink: #2c2f3a;
+  --captcha-noise: #8a8f7a;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1016; --surface: #141922; --fg: #e5e9f0; --muted: #9aa3b3; --line: #252c38;
+    --accent: #8fa6ff; --accent-ink: #0d1016; --accent-soft: #1a2342;
+    --code-bg: #0a0d12; --code-fg: #dde3ee; --code-dim: #7f899b; --code-key: #a9bbff; --code-str: #a8d99a;
+    --ok: #52c78f; --ok-soft: #12291f; --err: #ff7a6e; --err-soft: #321714;
+    --captcha-bg: #d9dccd; --captcha-ink: #22252e; --captcha-noise: #6f7462;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1016; --surface: #141922; --fg: #e5e9f0; --muted: #9aa3b3; --line: #252c38;
+  --accent: #8fa6ff; --accent-ink: #0d1016; --accent-soft: #1a2342;
+  --code-bg: #0a0d12; --code-fg: #dde3ee; --code-dim: #7f899b; --code-key: #a9bbff; --code-str: #a8d99a;
+  --ok: #52c78f; --ok-soft: #12291f; --err: #ff7a6e; --err-soft: #321714;
+  --captcha-bg: #d9dccd; --captcha-ink: #22252e; --captcha-noise: #6f7462;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.wrap {
+  max-width: 1080px; margin: 0 auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; letter-spacing: -0.015em; line-height: 1.12; margin: 0; }
+h1 { font-size: clamp(2.3rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.6rem, 3.4vw, 2.1rem); font-weight: 600; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; }
+code { font-family: var(--font-mono); font-size: 0.88em; }
+:not(pre) > code { background: var(--accent-soft); padding: 0.1em 0.35em; border-radius: 4px; }
+.eyebrow { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+
+/* Header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; }
+.brand svg { width: 28px; height: 28px; flex: none; }
+.brand .mark { fill: var(--accent); }
+.brand .wave { stroke: var(--accent-ink); }
+.nav { display: flex; align-items: center; gap: 24px; font-size: 0.95rem; }
+.nav a { color: var(--muted); text-decoration: none; }
+.nav a:hover { color: var(--fg); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: 600 0.95rem var(--font-body); border-radius: 8px; padding: 11px 18px; cursor: pointer;
+  text-decoration: none; border: 1px solid transparent; transition: transform 0.12s ease, background 0.12s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-quiet { background: transparent; color: var(--fg); border-color: var(--line); }
+.btn-quiet:hover { border-color: var(--muted); }
+.nav .btn { padding: 8px 14px; color: var(--accent-ink); }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: center; padding-block: 56px 72px; }
+.hero-text { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.lede { font-size: 1.15rem; color: var(--muted); max-width: 44ch; }
+.ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+.demo {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+  display: flex; flex-direction: column; gap: 14px; min-width: 0;
+  box-shadow: 0 1px 0 var(--line), 0 18px 40px -24px rgba(20, 30, 60, 0.35);
+}
+.demo-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+.method { font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 4px; }
+.captcha { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--line); }
+.captcha .bgr { fill: var(--captcha-bg); }
+.captcha text { fill: var(--captcha-ink); font-family: Georgia, "Times New Roman", serif; font-size: 40px; font-style: italic; }
+.captcha .noise { fill: none; stroke: var(--captcha-noise); stroke-width: 1.6; }
+.captcha .dot { fill: var(--captcha-noise); }
+.captcha .scan { fill: var(--accent); opacity: 0.16; transform-box: fill-box; animation: scan 3.6s ease-in-out infinite; }
+@keyframes scan { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(176px); } }
+@media (prefers-reduced-motion: reduce) { .captcha .scan { animation: none; opacity: 0; } }
+pre {
+  margin: 0; background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 14px 16px;
+  overflow-x: auto; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.65; tab-size: 2;
+}
+pre .k { color: var(--code-key); } pre .s { color: var(--code-str); } pre .c { color: var(--code-dim); }
+
+/* Facts */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.fact { padding: 22px 20px; display: flex; flex-direction: column; gap: 4px; }
+.fact + .fact { border-left: 1px solid var(--line); }
+.fact strong { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fact span { color: var(--muted); font-size: 0.9rem; }
+
+section { padding-block: 80px; scroll-margin-top: 16px; }
+.section-head { display: flex; flex-direction: column; gap: 12px; max-width: 640px; margin-bottom: 36px; }
+.section-head p { color: var(--muted); font-size: 1.05rem; }
+
+/* Steps: a real sequence, so they're numbered */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: step; list-style: none; margin: 0; padding: 0; }
+.steps li { display: flex; flex-direction: column; gap: 10px; padding-top: 18px; border-top: 2px solid var(--fg); counter-increment: step; }
+.steps li::before { content: counter(step, decimal-leading-zero); font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); }
+.steps p { color: var(--muted); }
+
+/* Code tabs */
+.code-wrap { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 48px; align-items: start; }
+.code-wrap .section-head { margin: 0; }
+.tabs { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tablist { display: flex; gap: 4px; flex-wrap: wrap; }
+.tablist button {
+  font: 500 0.85rem var(--font-body); background: transparent; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 12px; cursor: pointer;
+}
+.tablist button[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.code { position: relative; min-width: 0; }
+.copy {
+  position: absolute; top: 8px; right: 8px; font: 500 0.72rem var(--font-body); cursor: pointer;
+  background: color-mix(in srgb, var(--code-fg) 12%, transparent); color: var(--code-fg);
+  border: 1px solid color-mix(in srgb, var(--code-fg) 20%, transparent); border-radius: 5px; padding: 3px 9px;
+}
+.list-check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.list-check li { display: flex; gap: 10px; align-items: baseline; }
+.list-check li::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--accent); flex: none; transform: translateY(-2px); }
+
+/* Your captcha */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.panel h3 { display: flex; align-items: center; gap: 8px; }
+.pill { font: 600 0.7rem var(--font-body); letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
+.pill.yes { background: var(--ok-soft); color: var(--ok); }
+.pill.no { background: var(--err-soft); color: var(--err); }
+.panel ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; color: var(--muted); }
+
+/* Request form */
+.request { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 48px; align-items: start; }
+form { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; font-weight: 500; }
+label span.opt { color: var(--muted); font-weight: 400; }
+input, textarea, select {
+  font: 400 0.95rem var(--font-body); color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%;
+}
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+textarea { min-height: 96px; resize: vertical; }
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.form-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.note { font-size: 0.85rem; color: var(--muted); }
+.status { font-size: 0.92rem; padding: 12px 14px; border-radius: 8px; }
+.status.ok { background: var(--ok-soft); color: var(--ok); }
+.status.err { background: var(--err-soft); color: var(--err); }
+
+footer { border-top: 1px solid var(--line); padding-block: 28px 40px; color: var(--muted); font-size: 0.88rem; }
+.foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.foot nav { display: flex; gap: 20px; flex-wrap: wrap; }
+.foot a { color: var(--muted); }
+
+@media (max-width: 900px) {
+  .hero, .code-wrap, .split, .request { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fact:nth-child(3) { border-left: 0; }
+  .fact:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+  section { padding-block: 56px; }
+}
+@media (max-width: 560px) {
+  .nav a:not(.btn) { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding-block: 28px 48px; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/" aria-label="Captcha2Text home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect class="mark" width="32" height="32" rx="7"/><path class="wave" d="M6 19c4-7 7 3 10-3s6 5 10-2" fill="none" stroke-width="2.6" stroke-linecap="round"/></svg>
+      Captcha2Text
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#how">How it works</a>
+      <a href="/docs">Docs</a>
+      <a class="btn btn-primary" href="#request">Request a key</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="hero-text">
+        <p class="eyebrow">Captcha OCR API by Silifton</p>
+        <h1>Read text captchas with one API call.</h1>
+        <p class="lede">Send the captcha image and get its text back in the same response, with a confidence score that tells you when to load a new one instead.</p>
+        <div class="ctas">
+          <a class="btn btn-primary" href="#request">Request an API key</a>
+          <a class="btn btn-quiet" href="/docs">Read the docs</a>
+        </div>
+      </div>
+
+      <div class="demo" aria-label="Example request and response">
+        <div class="demo-row"><span><span class="method">POST</span> /v1/solve</span><span>captcha.png</span></div>
+        <svg class="captcha" viewBox="0 0 200 80" role="img" aria-label="A captcha image showing the word kerry">
+          <rect class="bgr" width="200" height="80"></rect>
+          <path class="noise" d="M4 50 C 40 22, 80 74, 120 42 S 180 22, 198 46"></path>
+          <path class="noise" d="M2 26 C 50 40, 90 12, 140 32 S 186 62, 199 56"></path>
+          <circle class="dot" cx="22" cy="14" r="1.6"></circle><circle class="dot" cx="61" cy="68" r="1.4"></circle>
+          <circle class="dot" cx="97" cy="10" r="1.8"></circle><circle class="dot" cx="133" cy="70" r="1.5"></circle>
+          <circle class="dot" cx="171" cy="16" r="1.7"></circle>
+          <text x="26" y="56" transform="rotate(-12 36 46)">k</text>
+          <text x="58" y="52" transform="rotate(9 66 42)">e</text>
+          <text x="88" y="60" transform="rotate(-6 96 50)">r</text>
+          <text x="114" y="50" transform="rotate(14 122 40)">r</text>
+          <text x="142" y="58" transform="rotate(-9 152 48)">y</text>
+          <rect class="scan" x="4" y="0" width="20" height="80"></rect>
+        </svg>
+        <pre><code>{
+  <span class="k">"success"</span>: true,
+  <span class="k">"text"</span>: <span class="s">"kerry"</span>,
+  <span class="k">"confidence"</span>: 0.98,
+  <span class="k">"processing_ms"</span>: 10
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="facts" role="list">
+      <div class="fact" role="listitem"><strong>1 request</strong><span>The answer comes back in the same response. No job id, no polling.</span></div>
+      <div class="fact" role="listitem"><strong>~10 ms</strong><span>Model time per image on our servers.</span></div>
+      <div class="fact" role="listitem"><strong>PNG, JPEG</strong><span>Up to 2 MB, any size. Upload a file or send base64.</span></div>
+      <div class="fact" role="listitem"><strong>0 to 1</strong><span>A confidence score with every answer, so you can skip likely-wrong ones.</span></div>
+    </div>
+
+    <section id="how">
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2>Three steps from image to answer.</h2>
+      </div>
+      <ol class="steps">
+        <li><h3>Get a key</h3><p>Request access below. We look at samples of your captcha first, so we know the API reads it well before you depend on it.</p></li>
+        <li><h3>Send the image</h3><p>POST the captcha to <code>/v1/solve</code> with your key in the <code>Authorization</code> header. Any language that can make an HTTP request works.</p></li>
+        <li><h3>Use the text</h3><p>Type <code>text</code> into the captcha field. If <code>confidence</code> is below your cut-off, load a new captcha and try again.</p></li>
+      </ol>
+    </section>
+
+    <section id="code">
+      <div class="code-wrap">
+        <div class="section-head">
+          <p class="eyebrow">The whole integration</p>
+          <h2>A few lines in the language you already use.</h2>
+          <p>Errors come back as JSON with a stable <code>code</code> you can branch on. The <a href="/docs">docs</a> list every field, error and limit.</p>
+        </div>
+        <div class="tabs">
+          <div class="tablist" role="tablist" aria-label="Language">
+            <button type="button" role="tab" id="tab-curl" aria-controls="panel-curl" aria-selected="true">cURL</button>
+            <button type="button" role="tab" id="tab-python" aria-controls="panel-python" aria-selected="false">Python</button>
+            <button type="button" role="tab" id="tab-node" aria-controls="panel-node" aria-selected="false">Node.js</button>
+          </div>
+          <div class="code" role="tabpanel" id="panel-curl" aria-labelledby="tab-curl"><pre><code>curl -X POST https://captcha.silifton.com/v1/solve \
+  -H "Authorization: Bearer $CAPTCHA2TEXT_KEY" \
+  -F "image=@captcha.png"</code></pre></div>
+          <div class="code" role="tabpanel" id="panel-python" aria-labelledby="tab-python" hidden><pre><code>import os, requests
+
+resp = requests.post(
+    <span class="s">"https://captcha.silifton.com/v1/solve"</span>,
+    headers={<span class="s">"Authorization"</span>: f<span class="s">"Bearer {os.environ['CAPTCHA2TEXT_KEY']}"</span>},
+    files={<span class="s">"image"</span>: open(<span class="s">"captcha.png"</span>, <span class="s">"rb"</span>)},
+    timeout=15,
+)
+data = resp.json()
+print(data[<span class="s">"text"</span>], data[<span class="s">"confidence"</span>])</code></pre></div>
+          <div class="code" role="tabpanel" id="panel-node" aria-labelledby="tab-node" hidden><pre><code>import { readFile } from <span class="s">"node:fs/promises"</span>;
+
+const form = new FormData();
+form.append(<span class="s">"image"</span>, new Blob([await readFile(<span class="s">"captcha.png"</span>)]), <span class="s">"captcha.png"</span>);
+
+const res = await fetch(<span class="s">"https://captcha.silifton.com/v1/solve"</span>, {
+  method: <span class="s">"POST"</span>,
+  headers: { Authorization: <span class="s">`Bearer ${process.env.CAPTCHA2TEXT_KEY}`</span> },
+  body: form,
+});
+const { text, confidence } = await res.json();</code></pre></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="yours">
+      <div class="split">
+        <div class="section-head">
+          <p class="eyebrow">Built around your captcha</p>
+          <h2>Every captcha looks different, so we measure yours.</h2>
+          <p>Send us 300 or more of your captchas with their answers. We run them through the API and tell you how many it reads correctly. If that isn't high enough, we train a model on your captcha style and attach it to your API key. Nothing changes in your code.</p>
+        </div>
+        <div class="panel">
+          <h3><span class="pill yes">Reads</span></h3>
+          <ul>
+            <li>Text captchas: a word or code drawn on an image</li>
+            <li>Letters, plus digits and other characters on request</li>
+            <li>Warped letters, lines and dots over the text</li>
+            <li>Math captchas like 4 + 3 − 5: send <code>type=math</code> and get the answer, 2</li>
+          </ul>
+          <h3><span class="pill no">Doesn't read</span></h3>
+          <ul>
+            <li>reCAPTCHA, hCaptcha, Cloudflare Turnstile</li>
+            <li>"Select every image with…" puzzles, sliders</li>
+            <li>Audio captchas</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="request">
+      <div class="request">
+        <div class="section-head">
+          <p class="eyebrow">Get started</p>
+          <h2>Request an API key.</h2>
+          <p>Tell us about your captcha and how many you expect to solve. We'll reply by email, usually with a request for sample images.</p>
+          <p class="note">Use the API only on captchas you own or are allowed to solve, such as testing your own site or accessibility tools. We suspend keys that break another service's terms.</p>
+        </div>
+        <form id="request-form" novalidate>
+          <div class="row">
+            <label for="f-name">Your name<input id="f-name" name="name" autocomplete="name" required maxlength="100"></label>
+            <label for="f-email">Email<input id="f-email" name="email" type="email" autocomplete="email" required maxlength="200"></label>
+          </div>
+          <div class="row">
+            <label for="f-company"><span>Company <span class="opt">(optional)</span></span><input id="f-company" name="company" autocomplete="organization" maxlength="150"></label>
+            <label for="f-website"><span>Website <span class="opt">(optional)</span></span><input id="f-website" name="website" type="url" placeholder="https://" maxlength="300"></label>
+          </div>
+          <label for="f-captcha">What does your captcha look like?<textarea id="f-captcha" name="captcha" maxlength="1000" placeholder="For example: 5 letters and digits, warped, with lines through them. Where it appears."></textarea></label>
+          <label for="f-volume">Captchas per month
+            <select id="f-volume" name="volume">
+              <option value="">Choose one</option>
+              <option>Under 10,000</option>
+              <option>10,000 to 100,000</option>
+              <option>100,000 to 1 million</option>
+              <option>Over 1 million</option>
+            </select>
+          </label>
+          <div class="hp" aria-hidden="true"><label for="f-nickname">Leave this empty<input id="f-nickname" name="nickname" tabindex="-1" autocomplete="off"></label></div>
+          <div class="form-foot">
+            <button class="btn btn-primary" type="submit" id="f-submit">Send request</button>
+            <span class="note">We use these details only to reply to you.</span>
+          </div>
+          <div class="status" id="f-status" role="status" hidden></div>
+        </form>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap foot">
+    <span>Captcha2Text by Silifton</span>
+    <nav aria-label="Footer">
+      <a href="/docs">API docs</a>
+      <a href="#request">Request a key</a>
+      <span>hello@silifton.com</span>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // Language tabs
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener("click", function () { select(t); });
+    t.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      var next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+      select(next); next.focus();
+    });
+  });
+
+  // Copy buttons on code blocks
+  document.querySelectorAll(".code").forEach(function (box) {
+    var pre = box.querySelector("pre");
+    var btn = document.createElement("button");
+    btn.type = "button"; btn.className = "copy"; btn.textContent = "Copy";
+    box.appendChild(btn);
+    btn.addEventListener("click", function () {
+      var done = function (label) { btn.textContent = label; setTimeout(function () { btn.textContent = "Copy"; }, 1400); };
+      try {
+        navigator.clipboard.writeText(pre.innerText).then(function () { done("Copied"); }, function () { done("Select to copy"); });
+      } catch (e) { done("Select to copy"); }
+    });
+  });
+
+  // Request form
+  var form = document.getElementById("request-form");
+  var status = document.getElementById("f-status");
+  var submit = document.getElementById("f-submit");
+  function show(kind, text) { status.hidden = false; status.className = "status " + kind; status.textContent = text; }
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var data = {};
+    new FormData(form).forEach(function (v, k) { data[k] = String(v).trim(); });
+    if (!data.name) { show("err", "Enter your name."); form.name.focus(); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(data.email || "")) { show("err", "Enter a valid email address."); form.email.focus(); return; }
+    submit.disabled = true; submit.textContent = "Sending…";
+    fetch("/request-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (res.ok) {
+          form.reset();
+          show("ok", "Request sent. We'll reply to " + data.email + ".");
+        } else {
+          show("err", (res.body.error && res.body.error.message) || "Something went wrong. Email hello@silifton.com instead.");
+        }
+      })
+      .catch(function () { show("err", "Couldn't reach the server. Check your connection, or email hello@silifton.com."); })
+      .then(function () { submit.disabled = false; submit.textContent = "Send request"; });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+Captcha2Text
+Copyright 2026 Silifton
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Models imported with training/import_ddddocr.py come from ddddocr
+(https://github.com/sml2h3/ddddocr), MIT License. Each imported model folder
+includes that licence as LICENSE-ddddocr.txt.

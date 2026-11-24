@@ -1,0 +1,7 @@
+#!/bin/sh
+# /usr/local/bin/c2t-keys on the server: manage API keys and admins in the live database.
+# Run as root: c2t-keys create --name "Acme Ltd"
+exec runuser -u captcha2text -- env \
+    C2T_DB_PATH=/opt/captcha2text/data/captcha2text.db \
+    C2T_MODELS_DIR=/opt/captcha2text/models \
+    /opt/captcha2text/venv/bin/c2t-keys "$@"

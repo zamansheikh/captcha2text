@@ -1,0 +1,20 @@
+# /etc/nginx/sites-available/captcha2text. Put your own domain in server_name.
+# `certbot --nginx -d <domain> --redirect` then adds the HTTPS listener and the
+# HTTP->HTTPS redirect.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name captcha.silifton.com;
+
+    # A 2 MB image as base64 is about 2.7 MB; the app enforces the exact limit.
+    client_max_body_size 4m;
+
+    location / {
+        proxy_pass http://127.0.0.1:7030;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+    }
+}
